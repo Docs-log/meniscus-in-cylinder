@@ -52,8 +52,8 @@ def rk4_dd(f, df, x, zmin):
         l2 = df(x[j] + 0.5 * h[j], z[j] + 0.5 * h[j] * k1, u[j] + 0.5 * h[j] * l1)
         k3 = f(x[j] + 0.5 * h[j], z[j] + 0.5 * h[j] * k2, u[j] + 0.5 * h[j] * l2)
         l3 = df(x[j] + 0.5 * h[j], z[j] + 0.5 * h[j] * k2, u[j] + 0.5 * h[j] * l2)
-        k4 = f(x[j] + h[j], z[j] + h[j] * k3, u[j] + h[j] * l3)
-        l4 = df(x[j] + h[j], z[j] + h[j] * k3, u[j] + h[j] * l3)
+        k4 = f(x[j + 1], z[j] + h[j] * k3, u[j] + h[j] * l3)
+        l4 = df(x[j + 1], z[j] + h[j] * k3, u[j] + h[j] * l3)
 
         z[j + 1] = z[j] + h[j] / 6 * (k1 + 2 * (k2 + k3) + k4)
         u[j + 1] = u[j] + h[j] / 6 * (l1 + 2 * (l2 + l3) + l4)
@@ -61,23 +61,21 @@ def rk4_dd(f, df, x, zmin):
     return z, u
 
 
-def shoot(zmin_init, u_goal, x, itr_max=20, dzmin=2e-6, tol=1e-12):
+def shoot(zmin, u_goal, x, itr_max=20, dzmin=2e-6, tol=1e-12):
     itr = 0
-    zmin = zmin_init
     while itr < itr_max:
         diff = dzmin / (bc(zmin + dzmin, u_goal, x) / bc(zmin, u_goal, x) - 1)
         if np.abs(diff) < tol:
             return zmin
         zmin -= diff
         itr += 1
-    assert itr < itr_max, "fail to find zmin"
 
-    return zmin
+    assert itr < itr_max, "fail to find zmin"
 
 
 def bc(zmin, u_goal, x):
-    _, u_end = rk4_dd(dz, du, x, zmin)
-    return u_end[-1] - u_goal
+    _, u = rk4_dd(dz, du, x, zmin)
+    return u[-1] - u_goal
 
 
 def dz(x, z, u):  # u := dz/dx
@@ -95,7 +93,7 @@ def meniscus_shape(r, rho, gamma, theta_deg, R, g):
 
     # capillary length (rough scale)
     lc = math.sqrt(gamma / (max(rho, 1e-12) * g))
-    x = r / max(R, 1e-12)
+    x = r / lc
 
     # initial guess
     zmin_init = math.cos(theta) / bessel_i1(R / lc)
@@ -104,7 +102,7 @@ def meniscus_shape(r, rho, gamma, theta_deg, R, g):
     zmin = shoot(zmin_init, u_goal, x)
     z, _ = rk4_dd(dz, du, x, zmin)
 
-    return z
+    return z * lc
 
 
 def solve(params):
