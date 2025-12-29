@@ -44,7 +44,7 @@ function plotResult(x, y) {
     name: "meniscus",
   };
   const layout = {
-    title: "Meniscus profile (example model)",
+    title: "Meniscus shape",
     xaxis: { title: "r [m]" },
     yaxis: { title: "z [m]" },
     margin: { l: 60, r: 20, t: 50, b: 60 },
