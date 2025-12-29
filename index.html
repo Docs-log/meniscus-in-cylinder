@@ -1,180 +1,83 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Meniscus Solver (Pyodide)</title>
-  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: 14px; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px; font-size: 14px; }
+    button { padding: 10px 14px; font-size: 14px; cursor: pointer; }
+    #status { margin: 10px 0; font-size: 14px; }
+    #plot { width: 100%; height: 520px; }
+    .nowrap { white-space: nowrap; }
+    .hint { color: #555; font-size: 13px; }
+    pre { background: #f6f8fa; padding: 12px; overflow: auto; }
+  </style>
+
+  <!-- Plotly for plotting in JS (lightweight & reliable on GitHub Pages) -->
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+
+  <!-- Pyodide -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
 </head>
+
 <body>
-  <main class="container">
-    <h1>Meniscus Shape in a Cylinder</h1>
+  <h1>Meniscus Solver</h1>
 
-    <section class="card">
-      <h2>Inputs</h2>
-      <div class="grid">
-        <label>Density, &rho; [kg/m<sup>3</sup>]
-          <input id="rho" type="number" value="1000" step="1">
-        </label>
-        <label>Surface Tension, &gamma; [N/m]
-          <input id="gamma" type="number" value="0.072" step="0.001">
-        </label>
-        <label>Contact Angle, &theta; [deg]
-          <input id="theta" type="number" value="30" step="0.1">
-        </label>
-        <label>Gravitational Accel., g [m/s<sup>2</sup>]
-          <input id="g" type="number" value="9.80665" step="0.00001">
-        </label>
-        <label>Radius of Cylinder, R [m]
-          <input id="R" type="number" value="0.01" step="0.0001">
-        </label>
-        <label>Number of Sample Points, N
-          <input id="N" type="number" value="400" step="1" min="50" max="5000">
-        </label>
-      </div>
+  <p class="hint">
+    Runs entirely in your browser via Pyodide (no server). Exports CSV and plots the result.
+    Units example: <span class="nowrap">m<sup>3</sup></span> (use <code>.nowrap</code> to prevent line breaks).
+  </p>
 
-      <div class="row">
-        <button id="btnRun" disabled>Pyodide Loading…</button>
-        <button id="btnDownload" disabled>Download CSV</button>
-      </div>
+  <div class="row">
+    <div>
+      <label for="rho">Liquid density ρ [kg/m³]</label>
+      <input id="rho" type="number" value="1000" step="1" />
+    </div>
 
-      <p class="hint">
-        The first time takes a little while to load Pyodide / NumPy / Matplotlib (subsequent times depend on your browser's cache).
-      </p>
-      <pre id="log" class="log"></pre>
-    </section>
+    <div>
+      <label for="gamma">Surface tension γ [N/m]</label>
+      <input id="gamma" type="number" value="0.072" step="0.001" />
+    </div>
 
-    <section class="card">
-      <h2>Plot</h2>
-      <img id="plotImg" alt="plot" />
-    </section>
-  </main>
+    <div>
+      <label for="theta">Contact angle θ [deg]</label>
+      <input id="theta" type="number" value="30" step="0.1" />
+    </div>
 
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.27.2/full/pyodide.js"></script>
+    <div>
+      <label for="R">Cylinder radius R [m]</label>
+      <input id="R" type="number" value="0.01" step="0.001" />
+    </div>
 
-  <script>
-    let pyodide = null;
-    let lastCsvText = null;
+    <div>
+      <label for="g">Gravity g [m/s²]</label>
+      <input id="g" type="number" value="9.80665" step="0.00001" />
+    </div>
 
-    const logEl = document.getElementById("log");
-    const btnRun = document.getElementById("btnRun");
-    const btnDownload = document.getElementById("btnDownload");
-    const plotImg = document.getElementById("plotImg");
+    <div>
+      <label for="n">Samples N</label>
+      <input id="n" type="number" value="200" step="10" />
+    </div>
+  </div>
 
-    function log(msg) {
-      logEl.textContent += msg + "\n";
-      logEl.scrollTop = logEl.scrollHeight;
-    }
+  <p style="margin-top: 12px;">
+    <button id="runBtn">Run</button>
+    <button id="downloadBtn" disabled>Download CSV</button>
+  </p>
 
-    function getInputs() {
-      return {
-        rho: Number(document.getElementById("rho").value),
-        gamma: Number(document.getElementById("gamma").value),
-        theta_deg: Number(document.getElementById("theta").value),
-        g: Number(document.getElementById("g").value),
-        R: Number(document.getElementById("R").value),
-        N: Number(document.getElementById("N").value),
-      };
-    }
+  <div id="status">Initializing...</div>
+  <div id="plot"></div>
 
-    async function init() {
-      log("Initialize Pyodide…");
-      pyodide = await loadPyodide();
-      log("Pyodide OK");
+  <details style="margin-top: 18px;">
+    <summary>Debug</summary>
+    <pre id="debug"></pre>
+  </details>
 
-      await pyodide.loadPackage(["numpy", "matplotlib"]);
-      log("numpy / matplotlib OK");
-      const solverText = await (await fetch("./solver.py")).text();
-      pyodide.FS.writeFile("solver.py", solverText);
-
-      btnRun.disabled = false;
-      btnRun.textContent = "Calculate and Plot";
-      log("Ready");
-    }
-
-    async function runSolver() {
-      lastCsvText = null;
-      btnDownload.disabled = true;
-      plotImg.removeAttribute("src");
-      logEl.textContent = "";
-
-      const p = getInputs();
-      log("Start Calculation…");
-
-      // Python側に入力を渡して実行
-      pyodide.globals.set("PARAMS", p);
-
-      const pyCode = `
-import io, base64, math
-import numpy as np
-import matplotlib.pyplot as plt
-
-from solver import solve_meniscus
-
-params = PARAMS
-r, z = solve_meniscus(
-    rho=params["rho"],
-    gamma=params["gamma"],
-    theta_deg=params["theta_deg"],
-    g=params["g"],
-    R=params["R"],
-    N=params["N"],
-)
-
-# CSV
-buf = io.StringIO()
-buf.write("r,z\\n")
-for ri, zi in zip(r, z):
-    buf.write(f"{ri},{zi}\\n")
-csv_text = buf.getvalue()
-
-# Plot (PNG -> base64)
-fig = plt.figure()
-plt.plot(r, z)
-plt.xlabel("r [m]")
-plt.ylabel("z [m]")
-plt.title("Meniscus profile")
-plt.grid(True)
-
-png_buf = io.BytesIO()
-fig.savefig(png_buf, format="png", bbox_inches="tight", dpi=150)
-plt.close(fig)
-png_b64 = base64.b64encode(png_buf.getvalue()).decode("ascii")
-
-(csv_text, png_b64)
-      `;
-
-      try {
-        const [csvText, pngB64] = await pyodide.runPythonAsync(pyCode);
-        lastCsvText = csvText;
-        plotImg.src = "data:image/png;base64," + pngB64;
-        btnDownload.disabled = false;
-        log("You can download CSV");
-      } catch (e) {
-        console.error(e);
-        log("Error:\n" + (e?.stack || e?.toString() || String(e)));
-      } finally {
-        pyodide.globals.delete("PARAMS");
-      }
-    }
-
-    function downloadCsv() {
-      if (!lastCsvText) return;
-      const blob = new Blob([lastCsvText], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "meniscus.csv";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    btnRun.addEventListener("click", runSolver);
-    btnDownload.addEventListener("click", downloadCsv);
-
-    init();
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
