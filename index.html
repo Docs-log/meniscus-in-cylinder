@@ -28,24 +28,19 @@
 <body>
   <h1>Meniscus Solver</h1>
 
-  <p class="hint">
-    Runs entirely in your browser via Pyodide (no server). Exports CSV and plots the result.
-    Units example: <span class="nowrap">m<sup>3</sup></span> (use <code>.nowrap</code> to prevent line breaks).
-  </p>
-
   <div class="row">
     <div>
-      <label for="rho">Liquid density ρ [kg/m³]</label>
+      <label for="rho">Liquid density &rho; [kg/m³]</label>
       <input id="rho" type="number" value="1000" step="1" />
     </div>
 
     <div>
-      <label for="gamma">Surface tension γ [N/m]</label>
+      <label for="gamma">Surface tension &gamma; [N/m]</label>
       <input id="gamma" type="number" value="0.072" step="0.001" />
     </div>
 
     <div>
-      <label for="theta">Contact angle θ [deg]</label>
+      <label for="theta">Contact angle &theta; [deg]</label>
       <input id="theta" type="number" value="30" step="0.1" />
     </div>
 
