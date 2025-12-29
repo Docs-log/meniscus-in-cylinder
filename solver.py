@@ -123,13 +123,6 @@ def solve(params):
     g = float(params.get("g", 9.80665))
     n = int(params.get("n", 200))
 
-    print(f"{rho=}")
-    print(f"{gamma=}")
-    print(f"{theta_deg=}")
-    print(f"{R=}")
-    print(f"{g=}")
-    print(f"{n=}")
-
     r = np.linspace(0.0, R, max(n, 2))
     z = meniscus_shape(r, rho, gamma, theta_deg, R, g)
 
