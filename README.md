@@ -1,7 +1,10 @@
 # meniscus-in-cylinder
 
 This repository provides a numerical solver for the axisymmetric meniscus shape
-formed by a liquid inside a cylindrical container.
+formed by a liquid inside a cylindrical container under gravity.
+
+A browser-based interactive demo is available via GitHub Pages:
+- **Live demo**: https://docs-log.github.io/meniscus-in-cylinder/
 
 ## Problem description
 
