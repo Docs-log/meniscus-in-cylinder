@@ -3,30 +3,107 @@ import math
 import numpy as np
 
 
-def _rk4_step(f, t, y, h):
-    k1 = f(t, y)
-    k2 = f(t + 0.5 * h, y + 0.5 * h * k1)
-    k3 = f(t + 0.5 * h, y + 0.5 * h * k2)
-    k4 = f(t + h, y + h * k3)
-    return y + (h / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
-
-
-def _example_meniscus_profile(r, rho, gamma, theta_deg, R, g):
+def bessel_i1(x: float) -> float:
     """
-    Placeholder model (NOT a full Young–Laplace solver):
-    Produces a smooth curve with boundary slope based on contact angle.
-    Replace this function with your real numerical solver.
+    Modified Bessel function of the first kind, order 1: I1(x)
+    Cephes-like approximation.
     """
-    # Capillary length (rough scale)
-    lc = math.sqrt(gamma / (max(rho, 1e-12) * g))
+    ax = abs(x)
+    if ax < 3.75:
+        y = x / 3.75
+        y2 = y * y
+        val = ax * (
+            0.5
+            + y2
+            * (
+                0.87890594
+                + y2 * (0.51498869 + y2 * (0.15084934 + y2 * (0.02658733 + y2 * (0.00301532 + y2 * 0.00032411))))
+            )
+        )
+        return val if x >= 0 else -val
+    else:
+        y = 3.75 / ax
+        poly = 0.39894228 + y * (
+            -0.03988024
+            + y
+            * (
+                -0.00362018
+                + y
+                * (
+                    0.00163801
+                    + y * (-0.01031555 + y * (0.02282967 + y * (-0.02895312 + y * (0.01787654 + y * -0.00420059))))
+                )
+            )
+        )
+        val = (math.exp(ax) / math.sqrt(ax)) * poly
+        return val if x >= 0 else -val
 
-    # Simple shape: z(r) = A * (1 - (r/R)^2) with A scaled by capillary length
+
+def rk4_dd(f, df, x, zmin):
+    z = np.empty_like(x)
+    u = np.empty_like(x)
+    z[0] = zmin
+    u[0] = 0.0
+    h = np.diff(x)
+    for j in range(x.size - 1):
+        k1 = f(x[j], z[j], u[j])
+        l1 = df(x[j], z[j], u[j])
+        k2 = f(x[j] + 0.5 * h[j], z[j] + 0.5 * h[j] * k1, u[j] + 0.5 * h[j] * l1)
+        l2 = df(x[j] + 0.5 * h[j], z[j] + 0.5 * h[j] * k1, u[j] + 0.5 * h[j] * l1)
+        k3 = f(x[j] + 0.5 * h[j], z[j] + 0.5 * h[j] * k2, u[j] + 0.5 * h[j] * l2)
+        l3 = df(x[j] + 0.5 * h[j], z[j] + 0.5 * h[j] * k2, u[j] + 0.5 * h[j] * l2)
+        k4 = f(x[j] + h[j], z[j] + h[j] * k3, u[j] + h[j] * l3)
+        l4 = df(x[j] + h[j], z[j] + h[j] * k3, u[j] + h[j] * l3)
+
+        z[j + 1] = z[j] + h[j] / 6 * (k1 + 2 * (k2 + k3) + k4)
+        u[j + 1] = u[j] + h[j] / 6 * (l1 + 2 * (l2 + l3) + l4)
+
+    return z, u
+
+
+def shoot(zmin_init, u_goal, x, itr_max=20, dzmin=2e-6, tol=1e-12):
+    itr = 0
+    zmin = zmin_init
+    while itr < itr_max:
+        diff = dzmin / (bc(zmin + dzmin, u_goal, x) / bc(zmin, u_goal, x) - 1)
+        if np.abs(diff) < tol:
+            return zmin
+        zmin -= diff
+        itr += 1
+    assert itr < itr_max, "fail to find zmin"
+
+    return zmin
+
+
+def bc(zmin, u_goal, x):
+    _, u_end = rk4_dd(dz, du, x, zmin)
+    return u_end[-1] - u_goal
+
+
+def dz(x, z, u):  # u := dz/dx
+    return u
+
+
+def du(x, z, u):  # du/dx
+    fct = 1 + u * u
+    return (z * np.sqrt(fct) - u / x) * fct if x != 0 else z * np.sqrt(fct) * fct
+
+
+def meniscus_shape(r, rho, gamma, theta_deg, R, g):
     theta = math.radians(theta_deg)
-    # crude amplitude scale
-    A = lc * (math.cos(theta) if abs(theta) <= math.pi else 1.0)
+    u_goal = 1.0 / np.tan(theta)
 
-    rr = r / max(R, 1e-12)
-    z = A * (1.0 - rr * rr)
+    # capillary length (rough scale)
+    lc = math.sqrt(gamma / (max(rho, 1e-12) * g))
+    x = r / max(R, 1e-12)
+
+    # initial guess
+    zmin_init = math.cos(theta) / bessel_i1(R / lc)
+
+    # find meniscus shape
+    zmin = shoot(zmin_init, u_goal, x)
+    z, _ = rk4_dd(dz, du, x, zmin)
+
     return z
 
 
@@ -38,7 +115,6 @@ def solve(params):
 
     Returns a dict: {"x": [...], "y": [...], "csv": "..."}
     """
-    # --- FIX for: TypeError: 'pyodide.ffi.JsProxy' object is not subscriptable
     if hasattr(params, "to_py"):
         params = params.to_py()
 
@@ -50,10 +126,10 @@ def solve(params):
     n = int(params.get("n", 200))
 
     r = np.linspace(0.0, R, max(n, 2))
-    z = np.array([_example_meniscus_profile(ri, rho, gamma, theta_deg, R, g) for ri in r], dtype=float)
+    z = meniscus_shape(r, rho, gamma, theta_deg, R, g)
 
     # Build CSV
-    lines = ["r,z"]
+    lines = ["# r, z"]
     for ri, zi in zip(r, z):
         lines.append(f"{ri:.12g},{zi:.12g}")
     csv = "\n".join(lines) + "\n"
