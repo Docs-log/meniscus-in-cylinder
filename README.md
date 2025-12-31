@@ -8,7 +8,7 @@ A browser-based interactive demo is available via GitHub Pages:
 
 ## Problem description
 
-The solver computes the meniscus profile 
+The solver computes the meniscus shape
 
 $$z = z(r), \qquad 0 \le r \le R ,$$
 
