@@ -30,7 +30,7 @@ a prescribed contact angle $\theta$ at the cylinder wall.
    $$z(0),$$
   
   is treated as an unknown shooting parameter.
-- An initial guess for $z(0)$ is constructed from the linearized solution:
+- An initial guess for $z(0)$ is obtained from the small-slope linearization of the Young–Laplace equation, which reduces to a modified Bessel equation:
   
   $$z(0) \approx \frac{\cos\theta}{I_1(R / \ell_c)} ,$$
   
