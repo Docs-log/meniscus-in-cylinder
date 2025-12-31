@@ -25,6 +25,12 @@ a prescribed contact angle $\theta$ at the cylinder wall.
 ## Numerical method
 
 - The governing equation is solved as a boundary-value problem using a **shooting method**.
+- The shooting parameter is iteratively adjusted so that the boundary condition
+  at the wall,
+  
+  $$z'(R) = \cot\theta ,$$
+
+  is satisfied.
 - The initial condition at the axis,
   
    $$z(0),$$
@@ -36,12 +42,6 @@ a prescribed contact angle $\theta$ at the cylinder wall.
   
   where $I_1$ is the modified Bessel function of order one and
   $\ell_c$ is the capillary length. In practice, I found that replacing $\cot\theta$ by $\cos\theta$ in the initial guess for $z(0)$ yields significantly better convergence for the full nonlinear problem. The reason for this empirical improvement is not fully understood, but it appears to reflect the geometric nature of the contact-angle condition in the nonlinear regime.
-- The shooting parameter is iteratively adjusted so that the boundary condition
-  at the wall,
-  
-  $$z'(R) = \cot\theta ,$$
-
-  is satisfied.
 
 ## Implementation notes
 
